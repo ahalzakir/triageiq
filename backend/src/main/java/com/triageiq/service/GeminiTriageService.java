@@ -112,10 +112,8 @@ public class GeminiTriageService {
                     "parts", List.of(Map.of("text", userContent))
                 );
 
-                // Use low thinking level for sub-3-second fast classification
                 Map<String, Object> generationConfig = Map.of(
-                    "responseMimeType", "application/json",
-                    "thinking_level", "low"
+                    "responseMimeType", "application/json"
                 );
 
                 Map<String, Object> requestPayload = Map.of(
