@@ -65,64 +65,78 @@ public class GeminiTriageService {
             return createFallbackResponse();
         }
 
-        try {
-            String url = String.format("%s/models/%s:generateContent?key=%s", baseUrl, model, apiKey);
-
-            String systemPrompt = "You are an IT helpdesk triage assistant. Classify the following support ticket " +
-                "and respond ONLY with a valid JSON object, no markdown, no explanation outside the JSON.\n\n" +
-                "Priority guide:\n" +
-                "P0 = production system down, total access loss, security breach\n" +
-                "P1 = major feature broken, multiple users affected\n" +
-                "P2 = single user issue, workaround exists\n" +
-                "P3 = low urgency, cosmetic, or informational\n\n" +
-                "Respond with exactly this JSON shape:\n" +
-                "{\n" +
-                "  \"category\": \"<one of: hardware, access, software, network, hr_adjacent, other>\",\n" +
-                "  \"priority\": \"<one of: P0, P1, P2, P3>\",\n" +
-                "  \"confidence\": <float between 0.0 and 1.0>,\n" +
-                "  \"reasoning\": \"<one sentence explaining your decision>\"\n" +
-                "}";
-
-            String userContent = String.format("Ticket title: %s\nTicket body: %s", title, body);
-
-            // Construct Gemini payload
-            Map<String, Object> systemInstruction = Map.of(
-                "parts", List.of(Map.of("text", systemPrompt))
-            );
-
-            Map<String, Object> content = Map.of(
-                "role", "user",
-                "parts", List.of(Map.of("text", userContent))
-            );
-
-            Map<String, Object> generationConfig = Map.of(
-                "responseMimeType", "application/json",
-                "temperature", 0.1
-            );
-
-            Map<String, Object> requestPayload = Map.of(
-                "systemInstruction", systemInstruction,
-                "contents", List.of(content),
-                "generationConfig", generationConfig
-            );
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestPayload, headers);
-            ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
-
-            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-                log.error("Gemini API call failed with status: {}", response.getStatusCode());
-                return createFallbackResponse();
-            }
-
-            return parseGeminiResponse(response.getBody());
-
-        } catch (Exception e) {
-            log.error("Exception occurred during Gemini triage: {}. Falling back to default.", e.getMessage());
-            return createFallbackResponse();
+        List<String> modelsToTry = new ArrayList<>();
+        if (model != null && !model.isBlank()) {
+            modelsToTry.add(model.trim());
         }
+        if (!modelsToTry.contains("gemini-2.5-flash")) {
+            modelsToTry.add("gemini-2.5-flash");
+        }
+        if (!modelsToTry.contains("gemini-1.5-flash")) {
+            modelsToTry.add("gemini-1.5-flash");
+        }
+
+        for (String currentModel : modelsToTry) {
+            try {
+                String url = String.format("%s/models/%s:generateContent?key=%s", baseUrl, currentModel, apiKey);
+
+                String systemPrompt = "You are an IT helpdesk triage assistant. Classify the following support ticket " +
+                    "and respond ONLY with a valid JSON object, no markdown, no explanation outside the JSON.\n\n" +
+                    "Priority guide:\n" +
+                    "P0 = production system down, total access loss, security breach\n" +
+                    "P1 = major feature broken, multiple users affected\n" +
+                    "P2 = single user issue, workaround exists\n" +
+                    "P3 = low urgency, cosmetic, or informational\n\n" +
+                    "Respond with exactly this JSON shape:\n" +
+                    "{\n" +
+                    "  \"category\": \"<one of: hardware, access, software, network, hr_adjacent, other>\",\n" +
+                    "  \"priority\": \"<one of: P0, P1, P2, P3>\",\n" +
+                    "  \"confidence\": <float between 0.0 and 1.0>,\n" +
+                    "  \"reasoning\": \"<one sentence explaining your decision>\"\n" +
+                    "}";
+
+                String userContent = String.format("Ticket title: %s\nTicket body: %s", title, body);
+
+                Map<String, Object> systemInstruction = Map.of(
+                    "parts", List.of(Map.of("text", systemPrompt))
+                );
+
+                Map<String, Object> content = Map.of(
+                    "role", "user",
+                    "parts", List.of(Map.of("text", userContent))
+                );
+
+                Map<String, Object> generationConfig = Map.of(
+                    "responseMimeType", "application/json",
+                    "temperature", 0.1
+                );
+
+                Map<String, Object> requestPayload = Map.of(
+                    "systemInstruction", systemInstruction,
+                    "contents", List.of(content),
+                    "generationConfig", generationConfig
+                );
+
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_JSON);
+
+                HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestPayload, headers);
+                ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
+
+                if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                    TriageResponse parsed = parseGeminiResponse(response.getBody());
+                    if (parsed != null && !FALLBACK_CATEGORY.equals(parsed.getCategory())) {
+                        log.info("Successfully triaged ticket using model: {}", currentModel);
+                        return parsed;
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Gemini model {} failed: {}. Trying next fallback model if available.", currentModel, e.getMessage());
+            }
+        }
+
+        log.error("All Gemini model attempts exhausted. Falling back to default P2/other.");
+        return createFallbackResponse();
     }
 
     private TriageResponse parseGeminiResponse(String rawJson) {
