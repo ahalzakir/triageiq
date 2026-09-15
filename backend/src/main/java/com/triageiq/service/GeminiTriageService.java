@@ -69,11 +69,11 @@ public class GeminiTriageService {
         if (model != null && !model.isBlank()) {
             modelsToTry.add(model.trim());
         }
+        if (!modelsToTry.contains("gemini-3.6-flash")) {
+            modelsToTry.add("gemini-3.6-flash");
+        }
         if (!modelsToTry.contains("gemini-2.5-flash")) {
             modelsToTry.add("gemini-2.5-flash");
-        }
-        if (!modelsToTry.contains("gemini-1.5-flash")) {
-            modelsToTry.add("gemini-1.5-flash");
         }
 
         for (String currentModel : modelsToTry) {
@@ -106,9 +106,9 @@ public class GeminiTriageService {
                     "parts", List.of(Map.of("text", userContent))
                 );
 
+                // For gemini-3.6-flash, do not specify temperature; use responseMimeType only
                 Map<String, Object> generationConfig = Map.of(
-                    "responseMimeType", "application/json",
-                    "temperature", 0.1
+                    "responseMimeType", "application/json"
                 );
 
                 Map<String, Object> requestPayload = Map.of(
