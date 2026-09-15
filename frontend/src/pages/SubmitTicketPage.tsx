@@ -84,7 +84,7 @@ export const SubmitTicketPage: React.FC = () => {
       <div className="text-center mb-8">
         <div className="inline-flex items-center space-x-2 bg-indigo-500/10 border border-indigo-500/30 px-3 py-1 rounded-full text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-3">
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Gemini 2.0 Flash AI Auto-Triage</span>
+          <span>Gemini AI Auto-Triage</span>
         </div>
         <h1 className="text-3xl font-extrabold text-[#f1f5f9] tracking-tight sm:text-4xl">
           Submit IT Support Request

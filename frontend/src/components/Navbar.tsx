@@ -71,7 +71,7 @@ export const Navbar: React.FC = () => {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span>Gemini 2.0 Flash: <strong className="text-slate-200">Active</strong></span>
+            <span>Gemini AI: <strong className="text-slate-200">Active</strong></span>
           </div>
         </div>
       </div>

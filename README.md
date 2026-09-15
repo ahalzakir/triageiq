@@ -4,9 +4,9 @@
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x-green?logo=springboot)
 ![React](https://img.shields.io/badge/React-18-blue?logo=react)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-3ECF8E?logo=supabase)
-![Gemini](https://img.shields.io/badge/AI-Gemini_2.0_Flash-4285F4?logo=google)
+![Gemini](https://img.shields.io/badge/AI-Google_Gemini_Flash-4285F4?logo=google)
 
-TriageIQ is an enterprise internal IT helpdesk system that automatically classifies, prioritizes, and routes employee support tickets using Google Gemini AI (2.0 Flash) in under 3 seconds. By replacing manual queue sorting with real-time AI triage, dynamic load-balanced agent assignments, and automated SLA breach escalations, TriageIQ ensures mission-critical incidents (P0/P1) trigger instant alerts while standard support flows operate friction-free.
+TriageIQ is an enterprise internal IT helpdesk system that automatically classifies, prioritizes, and routes employee support tickets using Google Gemini AI in under 3 seconds. By replacing manual queue sorting with real-time AI triage, dynamic load-balanced agent assignments, and automated SLA breach escalations, TriageIQ ensures mission-critical incidents (P0/P1) trigger instant alerts while standard support flows operate friction-free.
 
 ---
 
@@ -32,7 +32,7 @@ TriageIQ is an enterprise internal IT helpdesk system that automatically classif
                          |                                     |
                          v                                     v
          +-------------------------------+     +--------------------------------+
-         |     Google Gemini 2.0 Flash   |     |      Supabase PostgreSQL       |
+         |        Google Gemini AI       |     |      Supabase PostgreSQL       |
          |     - Priority (P0 - P3)      |     |     - tickets & ticket_events  |
          |     - Category classification |     |     - teams & agents           |
          |     - Confidence & Reasoning  |     |     - Flyway schema migrations |
@@ -58,7 +58,7 @@ TriageIQ is an enterprise internal IT helpdesk system that automatically classif
 |---|---|
 | **Backend** | Java 21, Spring Boot 3.x, Spring Data JPA, Flyway, Maven |
 | **Database** | PostgreSQL (Supabase hosted) with SSL |
-| **AI Triage Engine** | Google Gemini 2.0 Flash (`gemini-2.0-flash`) |
+| **AI Triage Engine** | Google Gemini AI (`gemini-3.8-flash` / `3.7-flash` / `3.5-flash-lite`) |
 | **Frontend** | React 18, TypeScript, Tailwind CSS, Vite, TanStack Query |
 | **Deployment** | Railway (Backend JAR container), Vercel (Frontend SPA) |
 | **Integrations** | Slack Web API (`chat.postMessage`), Gmail API + Cloud Pub/Sub |
