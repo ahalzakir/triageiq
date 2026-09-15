@@ -1,0 +1,27 @@
+# Environment & Secrets
+.env
+*.env.local
+*.env.*.local
+
+# Java / Maven
+target/
+*.class
+.mvn/wrapper/maven-wrapper.jar
+*.log
+
+# Node / Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
