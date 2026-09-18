@@ -25,8 +25,15 @@ public class GeminiTriageService {
     @Value("${gemini.base-url:https://generativelanguage.googleapis.com/v1beta}")
     private String baseUrl;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public GeminiTriageService() {
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(4000);
+        factory.setReadTimeout(5000);
+        this.restTemplate = new RestTemplate(factory);
+    }
 
     public static final String FALLBACK_CATEGORY = "other";
     public static final String FALLBACK_PRIORITY = "P2";

@@ -35,6 +35,7 @@ public class TicketService {
     private final AgentRepository agentRepository;
     private final GeminiTriageService geminiTriageService;
     private final SlackService slackService;
+    private final org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
     @Data
     @Builder
@@ -56,13 +57,12 @@ public class TicketService {
         private List<TicketEvent> events;
     }
 
-    @Transactional
     public Ticket createTicket(TicketCreateRequest request) {
         String source = (request.getSource() != null && !request.getSource().isBlank())
             ? request.getSource().toLowerCase()
             : "web";
 
-        // 1. Call Gemini AI Triage
+        // 1. Call Gemini AI Triage OUTSIDE the DB transaction to avoid connection starvation
         GeminiTriageService.TriageResponse triage = geminiTriageService.triageTicket(request.getTitle(), request.getBody());
         String priority = triage.getPriority() != null ? triage.getPriority().toUpperCase() : "P2";
         String category = triage.getCategory() != null ? triage.getCategory().toLowerCase() : "other";
@@ -71,78 +71,83 @@ public class TicketService {
         OffsetDateTime now = OffsetDateTime.now();
         OffsetDateTime slaDeadline = computeSlaDeadline(now, priority);
 
-        // 3. Find matching team
-        Team assignedTeam = teamRepository.findByCategorySpecialtyIgnoreCase(category)
-            .orElseGet(() -> teamRepository.findByNameIgnoreCase("General IT")
-                .orElseGet(() -> teamRepository.findAll().stream().findFirst().orElse(null)));
+        // 3. Atomically persist Ticket, Agent load, and Events inside short-lived DB transaction
+        Ticket savedTicket = transactionTemplate.execute(status -> {
+            // Find matching team
+            Team assignedTeam = teamRepository.findByCategorySpecialtyIgnoreCase(category)
+                .orElseGet(() -> teamRepository.findByNameIgnoreCase("General IT")
+                    .orElseGet(() -> teamRepository.findAll().stream().findFirst().orElse(null)));
 
-        // 4. Assign lowest-load agent in matching team
-        Agent assignedAgent = null;
-        if (assignedTeam != null) {
-            List<Agent> agents = agentRepository.findByTeamIdOrderByCurrentLoadAsc(assignedTeam.getId());
-            if (!agents.isEmpty()) {
-                assignedAgent = agents.get(0);
-            }
-        }
-        if (assignedAgent == null) {
-            // Global lowest load agent fallback
-            List<Agent> fallbackAgents = agentRepository.findAllByOrderByCurrentLoadAsc();
-            if (!fallbackAgents.isEmpty()) {
-                assignedAgent = fallbackAgents.get(0);
-                if (assignedTeam == null) {
-                    assignedTeam = assignedAgent.getTeam();
+            // Assign lowest-load agent in matching team
+            Agent assignedAgent = null;
+            if (assignedTeam != null) {
+                List<Agent> agents = agentRepository.findByTeamIdOrderByCurrentLoadAsc(assignedTeam.getId());
+                if (!agents.isEmpty()) {
+                    assignedAgent = agents.get(0);
                 }
             }
-        }
+            if (assignedAgent == null) {
+                // Global lowest load agent fallback
+                List<Agent> fallbackAgents = agentRepository.findAllByOrderByCurrentLoadAsc();
+                if (!fallbackAgents.isEmpty()) {
+                    assignedAgent = fallbackAgents.get(0);
+                    if (assignedTeam == null) {
+                        assignedTeam = assignedAgent.getTeam();
+                    }
+                }
+            }
 
-        if (assignedAgent != null) {
-            assignedAgent.setCurrentLoad(assignedAgent.getCurrentLoad() + 1);
-            agentRepository.save(assignedAgent);
-        }
+            if (assignedAgent != null) {
+                assignedAgent.setCurrentLoad(assignedAgent.getCurrentLoad() + 1);
+                agentRepository.save(assignedAgent);
+            }
 
-        // 5. Persist Ticket
-        Ticket ticket = Ticket.builder()
-            .title(request.getTitle())
-            .body(request.getBody())
-            .submittedBy(request.getSubmitted_by())
-            .source(source)
-            .status("open")
-            .priority(priority)
-            .category(category)
-            .assignedTeam(assignedTeam)
-            .assignedAgent(assignedAgent)
-            .aiConfidence(triage.getConfidence())
-            .aiReasoning(triage.getReasoning())
-            .slaDeadline(slaDeadline)
-            .build();
-
-        Ticket savedTicket = ticketRepository.save(ticket);
-
-        // 6. Write 'created' and 'assigned' ticket events
-        TicketEvent createdEvent = TicketEvent.builder()
-            .ticket(savedTicket)
-            .eventType("created")
-            .actor("system")
-            .notes(String.format("Ticket submitted via %s by %s. AI Triage: %s (%s, %.0f%% conf)",
-                source, request.getSubmitted_by(), priority, category, (triage.getConfidence() != null ? triage.getConfidence() * 100 : 0)))
-            .build();
-        ticketEventRepository.save(createdEvent);
-
-        if (assignedAgent != null) {
-            TicketEvent assignedEvent = TicketEvent.builder()
-                .ticket(savedTicket)
-                .eventType("assigned")
-                .actor("system")
-                .notes(String.format("Auto-routed to %s (%s) based on lowest load queue",
-                    assignedAgent.getName(), assignedTeam != null ? assignedTeam.getName() : "IT"))
+            // Persist Ticket
+            Ticket ticket = Ticket.builder()
+                .title(request.getTitle())
+                .body(request.getBody())
+                .submittedBy(request.getSubmitted_by())
+                .source(source)
+                .status("open")
+                .priority(priority)
+                .category(category)
+                .assignedTeam(assignedTeam)
+                .assignedAgent(assignedAgent)
+                .aiConfidence(triage.getConfidence())
+                .aiReasoning(triage.getReasoning())
+                .slaDeadline(slaDeadline)
                 .build();
-            ticketEventRepository.save(assignedEvent);
-        }
 
-        // 7. If P0 or P1, fire Slack Alert
-        if ("P0".equalsIgnoreCase(priority) || "P1".equalsIgnoreCase(priority)) {
-            String slackChannel = (assignedTeam != null && assignedTeam.getSlackChannel() != null)
-                ? assignedTeam.getSlackChannel()
+            Ticket persisted = ticketRepository.save(ticket);
+
+            // Write 'created' and 'assigned' ticket events
+            TicketEvent createdEvent = TicketEvent.builder()
+                .ticket(persisted)
+                .eventType("created")
+                .actor("system")
+                .notes(String.format("Ticket submitted via %s by %s. AI Triage: %s (%s, %.0f%% conf)",
+                    source, request.getSubmitted_by(), priority, category, (triage.getConfidence() != null ? triage.getConfidence() * 100 : 0)))
+                .build();
+            ticketEventRepository.save(createdEvent);
+
+            if (assignedAgent != null) {
+                TicketEvent assignedEvent = TicketEvent.builder()
+                    .ticket(persisted)
+                    .eventType("assigned")
+                    .actor("system")
+                    .notes(String.format("Auto-routed to %s (%s) based on lowest load queue",
+                        assignedAgent.getName(), assignedTeam != null ? assignedTeam.getName() : "IT"))
+                    .build();
+                ticketEventRepository.save(assignedEvent);
+            }
+
+            return persisted;
+        });
+
+        // 4. If P0 or P1, fire Slack Alert outside the DB transaction
+        if (savedTicket != null && ("P0".equalsIgnoreCase(savedTicket.getPriority()) || "P1".equalsIgnoreCase(savedTicket.getPriority()))) {
+            String slackChannel = (savedTicket.getAssignedTeam() != null && savedTicket.getAssignedTeam().getSlackChannel() != null)
+                ? savedTicket.getAssignedTeam().getSlackChannel()
                 : "#it-general";
             slackService.sendAlert(savedTicket, slackChannel, "High-Priority Incident Alert");
         }

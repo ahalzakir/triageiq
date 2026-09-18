@@ -55,7 +55,7 @@ public class RestExceptionHandler {
             "timestamp", OffsetDateTime.now().toString(),
             "status", HttpStatus.INTERNAL_SERVER_ERROR.value(),
             "error", "Internal Server Error",
-            "message", "An unexpected error occurred while processing the request."
+            "message", e.getMessage() != null ? e.getMessage() : "An unexpected error occurred while processing the request."
         ));
     }
 }
