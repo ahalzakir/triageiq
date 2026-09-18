@@ -141,12 +141,6 @@ Gmail Push Notifications via Google Cloud Pub/Sub and Slack Event Subscriptions 
 
 ---
 
-## Live Demo
-
-- **Production URL**: [Add Vercel URL after deployment]
-
----
-
 ## Key System Metrics & Operational Capabilities
 
 - ⚡ **Sub-3 Second AI Triage**: Automated priority assignment, category classification, and confidence scoring upon ticket creation.
