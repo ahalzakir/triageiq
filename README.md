@@ -8,7 +8,7 @@
 
 TriageIQ is an enterprise internal IT helpdesk system that automatically classifies, prioritizes, and routes employee support tickets using Google Gemini AI in under 3 seconds. By replacing manual queue sorting with real-time AI triage, dynamic load-balanced agent assignments, and automated SLA breach escalations, TriageIQ ensures mission-critical incidents (P0/P1) trigger instant alerts while standard support flows operate friction-free.
 
-> 🌐 **Live Application:** [TriageIQ — AI-Powered IT Ticket Triage](https://triageiq-cf0qf6a7t-sayed-ahal-zakir-s-projects.vercel.app/submit)
+> 🌐 **Live Application:** [TriageIQ — AI-Powered IT Ticket Triage](https://triageiq-o7l6xjud6-sayed-ahal-zakir-s-projects.vercel.app)
 
 ---
 
